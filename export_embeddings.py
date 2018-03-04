@@ -119,7 +119,7 @@ def main(args):
             label_list  = np.array(label_list)
 
             np.save(args.embeddings_name, emb_array)
-            np.save(args.labels_name, label_list)
+            np.save('./np_embeddings/label_list.npy', label_list)
             label_strings = np.asarray(label_strings)
             np.save('./np_embeddings/label_strings.npy', label_strings)
             np.save('./np_embeddings/image_list.npy', image_list)
