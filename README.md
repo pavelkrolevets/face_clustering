@@ -1,4 +1,4 @@
-# face_clustering
+# Face clustering using FaceNet and KMeans
 
 Before startinng clean folders ./np_embeddings ,  ./data/clustered, ./data/sorted
 
@@ -11,6 +11,5 @@ It will take some time because the amount of computations is O(x^2). This file i
 
 3. Finally, Run Cluster_faces.py. First, it will sort all off the face images based on the closest distance and save it to ./data/sorted.
 Second, it will cluster images using Kmeans algorithm. Number of cluster by default is 30. You can change it if youd like.
-
 
 

@@ -6,7 +6,6 @@ import os
 
 names = list(np.load('./np_embeddings/image_list.npy'))
 embeddings = pd.DataFrame(np.load('./np_embeddings/embeddings.npy'), index=names)
-
 matrix_ndarr = np.load('./np_embeddings/matrix.npy')
 
 matrix = pd.DataFrame(data=matrix_ndarr, index=names, columns=names)
