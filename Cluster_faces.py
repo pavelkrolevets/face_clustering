@@ -1,5 +1,10 @@
+"""
+Author: Pavel Krolevets @ Shanghai Jiao Tong University
+E-mail: pavelkrolevets@gmail.com
+"""
+
 import numpy as np
-from sklearn.cluster import DBSCAN, KMeans
+from sklearn.cluster import KMeans
 import pandas as pd
 from shutil import copy2
 import os

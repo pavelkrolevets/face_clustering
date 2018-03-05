@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 embeddings = np.load('./np_embeddings/embeddings.npy') # load embeddings of faces
 nrof_images = len(embeddings)
