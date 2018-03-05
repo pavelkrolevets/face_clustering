@@ -22,3 +22,6 @@ It will take some time because the manrix size of ```NxN``` with zeros on the ma
 3. Run ```Cluster_faces.py```.
 </br> First, it will sort all off the face images based on the closest distance and save sorted images to ./data/sorted.
 Second, it will cluster images using Kmeans algorithm. Number of cluster by default is 30. You can change it if you like.
+
+## Disclaimer
+This work is based on FaceNet achievement. You can check FaceNet model and papers [here](https://github.com/davidsandberg/facenet).
