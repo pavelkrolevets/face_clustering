@@ -1,4 +1,4 @@
-# Face clustering using FaceNet and KMeans
+# Clustering people using FaceNet and KMeans
 
 ### Prerequisites
 
