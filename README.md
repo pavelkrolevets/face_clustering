@@ -1,7 +1,11 @@
 # Clustering people using FaceNet and KMeans
 
 ### Prerequisites
-
+* installed dependencies ```tensorflow``` and ```opencv``` libraries.
+```bash
+pip install tensorflow
+conda install opencv
+```
 * correct ```PYTHONPATH=full_path_to_folder/scr```
 * pretrained FaceNet model
 in the folder ```./models/```. You can download it [here](https://drive.google.com/file/d/0B5MzpY9kBtDVZ2RpVDYwWmxoSUk).
