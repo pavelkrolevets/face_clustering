@@ -1,4 +1,4 @@
-# Clustering people using FaceNet and KMeans
+# Sort similar looking face pictures to clusters using FaceNet and KMeans
 
 ### Prerequisites
 * installed dependencies ```tensorflow``` and ```opencv``` libraries.
