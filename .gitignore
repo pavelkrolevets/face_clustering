@@ -1,2 +1,15 @@
 .vscode/
 .venv/
+venv/
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+develop-eggs/
+
+# Environments
+.env
