@@ -59,7 +59,6 @@ import os
 import argparse
 import facenet
 import align.detect_face
-import glob
 
 from six.moves import xrange
 

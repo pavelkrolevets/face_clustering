@@ -30,7 +30,7 @@ for i in range(len(embeddings)-1):
     print(face)
 for i in range(len(sorted_faces)):
     folder_for_sort = './data/sorted/'
-    folder_for_sort = folder_for_sort + str([i])
+    folder_for_sort = folder_for_sort + str(i)
     file = sorted_faces[i]
     print(file)
     copy2(file, folder_for_sort)
