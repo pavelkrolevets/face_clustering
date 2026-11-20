@@ -1,0 +1,19 @@
+.vscode/
+.venv/
+venv/
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+develop-eggs/
+
+# Environments
+.env
+
+# Pipeline artifacts and model weights (binary, regenerated on run)
+np_embeddings/*.npy
+src/align/det*.npy

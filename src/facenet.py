@@ -32,7 +32,7 @@ from subprocess import Popen, PIPE
 import tensorflow as tf
 from tensorflow.python.framework import ops
 import numpy as np
-from scipy import misc
+import cv2
 from sklearn.model_selection import KFold
 from scipy import interpolate
 from tensorflow.python.training import training
@@ -40,6 +40,11 @@ import random
 import re
 from tensorflow.python.platform import gfile
 from six import iteritems
+
+# Legacy TensorFlow 1.x graph API: the functions below use the TF 1.x
+# session/graph/variable API, which is only available under tf.compat.v1
+# in TensorFlow 2.x (and requires eager execution to be disabled).
+tf.compat.v1.disable_eager_execution()
 
 def triplet_loss(anchor, positive, negative, alpha):
     """Calculate the triplet loss according to the FaceNet paper
@@ -52,7 +57,7 @@ def triplet_loss(anchor, positive, negative, alpha):
     Returns:
       the triplet loss according to the FaceNet paper as a float tensor.
     """
-    with tf.variable_scope('triplet_loss'):
+    with tf.compat.v1.variable_scope('triplet_loss'):
         pos_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, positive)), 1)
         neg_dist = tf.reduce_sum(tf.square(tf.subtract(anchor, negative)), 1)
         
@@ -79,12 +84,12 @@ def center_loss(features, label, alfa, nrof_classes):
        (http://ydwen.github.io/papers/WenECCV16.pdf)
     """
     nrof_features = features.get_shape()[1]
-    centers = tf.get_variable('centers', [nrof_classes, nrof_features], dtype=tf.float32,
-        initializer=tf.constant_initializer(0), trainable=False)
+    centers = tf.compat.v1.get_variable('centers', [nrof_classes, nrof_features], dtype=tf.float32,
+        initializer=tf.compat.v1.constant_initializer(0), trainable=False)
     label = tf.reshape(label, [-1])
     centers_batch = tf.gather(centers, label)
     diff = (1 - alfa) * (centers_batch - features)
-    centers = tf.scatter_sub(centers, label, diff)
+    centers = tf.compat.v1.scatter_sub(centers, label, diff)
     loss = tf.reduce_mean(tf.square(features - centers_batch))
     return loss, centers
 
@@ -110,13 +115,15 @@ def read_images_from_disk(input_queue):
       Two tensors: the decoded image, and the string label.
     """
     label = input_queue[1]
-    file_contents = tf.read_file(input_queue[0])
+    file_contents = tf.compat.v1.read_file(input_queue[0])
     example = tf.image.decode_image(file_contents, channels=3)
     return example, label
   
 def random_rotate_image(image):
     angle = np.random.uniform(low=-10.0, high=10.0)
-    return misc.imrotate(image, angle, 'bicubic')
+    h, w = image.shape[:2]
+    matrix = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
+    return cv2.warpAffine(image, matrix, (w, h), flags=cv2.INTER_CUBIC, borderValue=(0, 0, 0))
   
 def read_and_augment_data(image_list, label_list, image_size, batch_size, max_nrof_epochs, 
         random_crop, random_flip, random_rotate, nrof_preprocess_threads, shuffle=True):
@@ -125,18 +132,18 @@ def read_and_augment_data(image_list, label_list, image_size, batch_size, max_nr
     labels = ops.convert_to_tensor(label_list, dtype=tf.int32)
     
     # Makes an input queue
-    input_queue = tf.train.slice_input_producer([images, labels],
+    input_queue = tf.compat.v1.train.slice_input_producer([images, labels],
         num_epochs=max_nrof_epochs, shuffle=shuffle)
 
     images_and_labels = []
     for _ in range(nrof_preprocess_threads):
         image, label = read_images_from_disk(input_queue)
         if random_rotate:
-            image = tf.py_func(random_rotate_image, [image], tf.uint8)
+            image = tf.compat.v1.py_func(random_rotate_image, [image], tf.uint8)
         if random_crop:
-            image = tf.random_crop(image, [image_size, image_size, 3])
+            image = tf.compat.v1.random_crop(image, [image_size, image_size, 3])
         else:
-            image = tf.image.resize_image_with_crop_or_pad(image, image_size, image_size)
+            image = tf.compat.v1.image.resize_image_with_crop_or_pad(image, image_size, image_size)
         if random_flip:
             image = tf.image.random_flip_left_right(image)
         #pylint: disable=no-member
@@ -144,7 +151,7 @@ def read_and_augment_data(image_list, label_list, image_size, batch_size, max_nr
         image = tf.image.per_image_standardization(image)
         images_and_labels.append([image, label])
 
-    image_batch, label_batch = tf.train.batch_join(
+    image_batch, label_batch = tf.compat.v1.train.batch_join(
         images_and_labels, batch_size=batch_size,
         capacity=4 * nrof_preprocess_threads * batch_size,
         allow_smaller_final_batch=True)
@@ -163,8 +170,8 @@ def _add_loss_summaries(total_loss):
       loss_averages_op: op for generating moving averages of losses.
     """
     # Compute the moving average of all individual losses and the total loss.
-    loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
-    losses = tf.get_collection('losses')
+    loss_averages = tf.compat.v1.train.ExponentialMovingAverage(0.9, name='avg')
+    losses = tf.compat.v1.get_collection('losses')
     loss_averages_op = loss_averages.apply(losses + [total_loss])
   
     # Attach a scalar summmary to all individual losses and the total loss; do the
@@ -172,8 +179,8 @@ def _add_loss_summaries(total_loss):
     for l in losses + [total_loss]:
         # Name each loss as '(raw)' and name the moving average version of the loss
         # as the original loss name.
-        tf.summary.scalar(l.op.name +' (raw)', l)
-        tf.summary.scalar(l.op.name, loss_averages.average(l))
+        tf.compat.v1.summary.scalar(l.op.name +' (raw)', l)
+        tf.compat.v1.summary.scalar(l.op.name, loss_averages.average(l))
   
     return loss_averages_op
 
@@ -184,15 +191,15 @@ def train(total_loss, global_step, optimizer, learning_rate, moving_average_deca
     # Compute gradients.
     with tf.control_dependencies([loss_averages_op]):
         if optimizer=='ADAGRAD':
-            opt = tf.train.AdagradOptimizer(learning_rate)
+            opt = tf.compat.v1.train.AdagradOptimizer(learning_rate)
         elif optimizer=='ADADELTA':
-            opt = tf.train.AdadeltaOptimizer(learning_rate, rho=0.9, epsilon=1e-6)
+            opt = tf.compat.v1.train.AdadeltaOptimizer(learning_rate, rho=0.9, epsilon=1e-6)
         elif optimizer=='ADAM':
-            opt = tf.train.AdamOptimizer(learning_rate, beta1=0.9, beta2=0.999, epsilon=0.1)
+            opt = tf.compat.v1.train.AdamOptimizer(learning_rate, beta1=0.9, beta2=0.999, epsilon=0.1)
         elif optimizer=='RMSPROP':
-            opt = tf.train.RMSPropOptimizer(learning_rate, decay=0.9, momentum=0.9, epsilon=1.0)
+            opt = tf.compat.v1.train.RMSPropOptimizer(learning_rate, decay=0.9, momentum=0.9, epsilon=1.0)
         elif optimizer=='MOM':
-            opt = tf.train.MomentumOptimizer(learning_rate, 0.9, use_nesterov=True)
+            opt = tf.compat.v1.train.MomentumOptimizer(learning_rate, 0.9, use_nesterov=True)
         else:
             raise ValueError('Invalid optimization algorithm')
     
@@ -203,19 +210,19 @@ def train(total_loss, global_step, optimizer, learning_rate, moving_average_deca
   
     # Add histograms for trainable variables.
     if log_histograms:
-        for var in tf.trainable_variables():
-            tf.summary.histogram(var.op.name, var)
+        for var in tf.compat.v1.trainable_variables():
+            tf.compat.v1.summary.histogram(var.op.name, var)
    
     # Add histograms for gradients.
     if log_histograms:
         for grad, var in grads:
             if grad is not None:
-                tf.summary.histogram(var.op.name + '/gradients', grad)
+                tf.compat.v1.summary.histogram(var.op.name + '/gradients', grad)
   
     # Track the moving averages of all trainable variables.
-    variable_averages = tf.train.ExponentialMovingAverage(
+    variable_averages = tf.compat.v1.train.ExponentialMovingAverage(
         moving_average_decay, global_step)
-    variables_averages_op = variable_averages.apply(tf.trainable_variables())
+    variables_averages_op = variable_averages.apply(tf.compat.v1.trainable_variables())
   
     with tf.control_dependencies([apply_gradient_op, variables_averages_op]):
         train_op = tf.no_op(name='train')
@@ -256,7 +263,11 @@ def load_data(image_paths, do_random_crop, do_random_flip, image_size, do_prewhi
     nrof_samples = len(image_paths)
     images = np.zeros((nrof_samples, image_size, image_size, 3))
     for i in range(nrof_samples):
-        img = misc.imread(image_paths[i])
+        img = cv2.imread(image_paths[i])
+        if img is None:
+            raise ValueError('Unable to load image: %s' % image_paths[i])
+        if img.ndim == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         if img.ndim == 2:
             img = to_rgb(img)
         if do_prewhiten:
@@ -386,8 +397,8 @@ def load_model(model):
         print('Metagraph file: %s' % meta_file)
         print('Checkpoint file: %s' % ckpt_file)
       
-        saver = tf.train.import_meta_graph(os.path.join(model_exp, meta_file))
-        saver.restore(tf.get_default_session(), os.path.join(model_exp, ckpt_file))
+        saver = tf.compat.v1.train.import_meta_graph(os.path.join(model_exp, meta_file))
+        saver.restore(tf.compat.v1.get_default_session(), os.path.join(model_exp, ckpt_file))
     
 def get_model_filenames(model_dir):
     files = os.listdir(model_dir)
