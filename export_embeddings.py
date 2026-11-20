@@ -51,7 +51,7 @@ from __future__ import division
 from __future__ import print_function
 
 import time
-from scipy import misc
+import cv2
 import tensorflow as tf
 import numpy as np
 import sys
@@ -62,6 +62,11 @@ import align.detect_face
 
 from six.moves import xrange
 
+# Legacy TensorFlow 1.x graph API: the functions below use the TF 1.x
+# session/graph/variable API, which is only available under tf.compat.v1
+# in TensorFlow 2.x (and requires eager execution to be disabled).
+tf.compat.v1.disable_eager_execution()
+
 def main(args):
     train_set = facenet.get_dataset(args.data_dir)
     image_list, label_list = facenet.get_image_paths_and_labels(train_set)
@@ -70,17 +75,17 @@ def main(args):
         head, tail = os.path.split(os.path.split(image_list[i])[0])
         label_strings.append(tail)
 
-    with tf.Graph().as_default():
+    with tf.compat.v1.Graph().as_default():
 
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
 
             # Load the model
             facenet.load_model(args.model_dir)
 
             # Get input and output tensors
-            images_placeholder = tf.get_default_graph().get_tensor_by_name("input:0")
-            embeddings = tf.get_default_graph().get_tensor_by_name("embeddings:0")
-            phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
+            images_placeholder = tf.compat.v1.get_default_graph().get_tensor_by_name("input:0")
+            embeddings = tf.compat.v1.get_default_graph().get_tensor_by_name("embeddings:0")
+            phase_train_placeholder = tf.compat.v1.get_default_graph().get_tensor_by_name("phase_train:0")
 
             # Run forward pass to calculate embeddings
             nrof_images = len(image_list)
@@ -130,9 +135,9 @@ def load_and_align_data(image_paths, image_size, margin, gpu_memory_fraction):
     factor = 0.709 # scale factor
 
     print('Creating networks and loading parameters')
-    with tf.Graph().as_default():
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_memory_fraction)
-        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
+    with tf.compat.v1.Graph().as_default():
+        gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=gpu_memory_fraction)
+        sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
         with sess.as_default():
             pnet, rnet, onet = align.detect_face.create_mtcnn(sess, None)
 
@@ -140,17 +145,26 @@ def load_and_align_data(image_paths, image_size, margin, gpu_memory_fraction):
     img_list = [None] * nrof_samples
     for i in xrange(nrof_samples):
         print(image_paths[i])
-        img = misc.imread(os.path.expanduser(image_paths[i]))
+        img = cv2.imread(os.path.expanduser(image_paths[i]))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img_size = np.asarray(img.shape)[0:2]
         bounding_boxes, _ = align.detect_face.detect_face(img, minsize, pnet, rnet, onet, threshold, factor)
-        det = np.squeeze(bounding_boxes[0,0:4])
-        bb = np.zeros(4, dtype=np.int32)
-        bb[0] = np.maximum(det[0]-margin/2, 0)
-        bb[1] = np.maximum(det[1]-margin/2, 0)
-        bb[2] = np.minimum(det[2]+margin/2, img_size[1])
-        bb[3] = np.minimum(det[3]+margin/2, img_size[0])
+        if bounding_boxes.shape[0] == 0:
+            # Defensive fallback: no face detected. Crop the central square
+            # instead of aborting the whole (multi-hour) run on one bad image.
+            side = int(min(img_size))
+            cx, cy = img_size[1] // 2, img_size[0] // 2
+            half = side // 2
+            bb = np.array([cx - half, cy - half, cx + half, cy + half], dtype=np.int32)
+        else:
+            det = np.squeeze(bounding_boxes[0,0:4])
+            bb = np.zeros(4, dtype=np.int32)
+            bb[0] = np.maximum(det[0]-margin/2, 0)
+            bb[1] = np.maximum(det[1]-margin/2, 0)
+            bb[2] = np.minimum(det[2]+margin/2, img_size[1])
+            bb[3] = np.minimum(det[3]+margin/2, img_size[0])
         cropped = img[bb[1]:bb[3],bb[0]:bb[2],:]
-        aligned = misc.imresize(cropped, (image_size, image_size), interp='bilinear')
+        aligned = cv2.resize(cropped, (image_size, image_size), interpolation=cv2.INTER_LINEAR)
         prewhitened = facenet.prewhiten(aligned)
         img_list[i] = prewhitened
     images = np.stack(img_list)

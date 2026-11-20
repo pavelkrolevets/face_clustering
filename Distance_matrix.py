@@ -12,15 +12,12 @@ for i in range(nrof_images):
     print('    %1d     ' % i, end='')
 print('')
 for i in range(nrof_images):
-    #print('%1d  ' % i, end='')
-    for j in range(nrof_images):
-        dist = np.sqrt(np.sum(np.square(np.subtract(embeddings[i, :], embeddings[j, :]))))
-        matrix[i][j] = dist
+    # Vectorized per row: computes exactly the same Euclidean distances as
+    # the original element-wise double loop, but as a single numpy operation.
+    matrix[i, :] = np.sqrt(np.sum(np.square(embeddings[i, :] - embeddings), axis=1))
     if i % 1000 == 0:
         print('  %1.4f  ' % i, '\n', end='')
 
 print('')
 np.save('./np_embeddings/matrix.npy', matrix)
 print("Saved")
-
-

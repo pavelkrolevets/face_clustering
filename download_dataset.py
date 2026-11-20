@@ -14,7 +14,10 @@ import urllib.request
 PRIMARY_URL = 'http://vis-www.cs.umass.edu/lfw/lfw.tgz'
 MIRRORS = [
     # Mirrors to fall back to when the primary URL is not accessible.
-    # Example: 'https://some-mirror.example.com/lfw/lfw.tgz',
+    # The original UMass host (vis-www.cs.umass.edu) has been decommissioned,
+    # so the default fallback is the full LFW release (13233 images) mirrored
+    # on Hugging Face:
+    'https://huggingface.co/datasets/DerrickUnleashed/LFW/resolve/main/lfw.tgz',
 ]
 
 DATA_DIR = './data/lfw'
@@ -57,6 +60,11 @@ def download_and_extract():
             members = [m for m in tar.getmembers() if m.name]
             if not members:
                 raise RuntimeError('The LFW dataset archive is empty.')
+            try:
+                tar.extractall(tmp_dir, filter='fully_trusted')
+            except TypeError:
+                # Python < 3.12 has no filter argument.
+                tar.extractall(tmp_dir)
             top_level = members[0].name.split('/')[0]
             src_dir = os.path.join(tmp_dir, top_level)
             if not os.path.isdir(src_dir):
@@ -64,7 +72,11 @@ def download_and_extract():
                 src_dir = tmp_dir
             for entry in sorted(os.listdir(src_dir)):
                 source = os.path.join(src_dir, entry)
-                shutil.move(source, os.path.join(DATA_DIR, entry))
+                destination = os.path.join(DATA_DIR, entry)
+                if os.path.exists(destination):
+                    # Already present from a previous run; leave it as is.
+                    continue
+                shutil.move(source, destination)
 
     print(f'LFW dataset extracted to {DATA_DIR}')
 
