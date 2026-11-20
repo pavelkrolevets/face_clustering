@@ -13,3 +13,7 @@ develop-eggs/
 
 # Environments
 .env
+
+# Pipeline artifacts and model weights (binary, regenerated on run)
+np_embeddings/*.npy
+src/align/det*.npy
